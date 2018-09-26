@@ -7,12 +7,19 @@
 
 #include "/home/lhb/PAC/software/mkl/include/mkl.h"
 
+#include "schur_lib/rt_nonfinite.h"
+#include "schur_lib/schur_decompose.h"
+#include "schur_lib/main.h"
+#include "schur_lib/schur_decompose_terminate.h"
+#include "schur_lib/schur_decompose_initialize.h"
+
+/*
 #include "libs/rt_nonfinite.h"
 #include "libs/eigvalue.h"
 #include "libs/main.h"
 #include "libs/eigvalue_terminate.h"
 #include "libs/eigvalue_initialize.h"
-
+*/
 
 /*
 #include "libs/rt_nonfinite.h"
@@ -81,7 +88,7 @@ void test_func()
     double * w = zeros_vector(3);
     Mat * v = ConstructMat();
     v = MatCreate(v, 3, 3);
-    eig(m, v, w);
+    schur_eig(m, v, w);
     MatDump(v);
     VectorDump(w, 3);
 }
@@ -349,7 +356,7 @@ int eig(Mat * target, Mat * eig_vector, double *eig_value)
     wr = NULL;
     return ret;
 }
-
+/*
 int eig_128_v2(Mat * target, Mat * eig_vector, double *eig_value)
 {
     int i, j;
@@ -381,7 +388,7 @@ int eig_128_v2(Mat * target, Mat * eig_vector, double *eig_value)
     eigvalue_terminate();
     return 0;
 }
-
+*/
 int eig_128(Mat * target, Mat * eig_vector, double *eig_value)
 {
     int i, j;
@@ -456,7 +463,7 @@ int eig_3(Mat * target, Mat * eig_vector, double *eig_value)
     }
     return ret;
 }
-
+/*
 int eig_3_v2(Mat * target, Mat * eig_vector, double * eig_value)
 {
 	int i, j;
@@ -485,6 +492,48 @@ int eig_3_v2(Mat * target, Mat * eig_vector, double * eig_value)
     }
     eigvalue_terminate();
 	return 0;
+}
+*/
+int schur_eig(Mat * target, Mat * eig_vector, double * eig_value)
+{
+    int i, j;
+    int pos;
+    double A[N_3 * N_3];
+    double U[N_3 * N_3];
+    double T[N_3 * N_3];
+    for (i = 0; i < N_3; i++)
+    {
+        for (j = 0; j < N_3; j++)
+        {
+            A[i * N_3 + j] = target->element[i][j];
+        }
+    }
+    schur_decompose_initialize();
+    schur_decompose(A, U, T);
+    schur_decompose_terminate();
+    for (i = 0; i < N_3; i++)
+    {
+        for (j = 0; j < N_3; j++)
+        {
+            eig_vector->element[i][j] = U[i * N_3 + j];
+        }
+    }
+    for (i = 0; i < N_3; i++)
+    {
+        eig_value[i] = T[i * N_3 + i];
+    }
+    int max = eig_value[0];
+    if (max < eig_value[1])
+    {
+        max = eig_value[1];
+        pos = 1;
+    }
+    if (max < eig_value[2])
+    {
+        max = eig_value[2];
+        pos = 2;
+    }
+    return pos;
 }
 
 int part_mul(Mat* src1, Mat* src2, Mat* dst, int src1_r_begin, int src2_r_begin, int src1_c_begin, int src2_c_begin, int mid)
@@ -1055,15 +1104,16 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
                 }
                 for (s = 0; s < (nm / m); s++)
                 {
-                    //g->element[1][s] = A->element[i][Iq[s]] + A->element[j][Ip[s]];
-                    g->element[1][s] = A->element[i][Iq[s]];
+                    g->element[1][s] = A->element[i][Iq[s]] + A->element[j][Ip[s]];
+                    //g->element[1][s] = A->element[i][Iq[s]];
                 }
                 for (s = 0; s < (nm / m); s++)
                 {
-                    //g->element[2][s] = A->element[j][Ip[s]] - A->element[i][Iq[s]];
-                    g->element[2][s] = A->element[j][Ip[s]];
+                    g->element[2][s] = A->element[j][Ip[s]] - A->element[i][Iq[s]];
+                    //g->element[2][s] = A->element[j][Ip[s]];
                 }
-                //matrix_mul_tran(g, g, Res_3);
+                matrix_mul_tran(g, g, Res_3);
+                //int tmp_pos = schur_eig(Res_3, vcp_3, d_3);
                 //Temp_3 = MatMul(B0, Res_3, Temp_3);
                 //Res_3 = MatMul(Temp_3, TB0, Res_3);
                 //eig_3(Res_3, vcp_3, d_3);
@@ -1071,11 +1121,11 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
 				//eig(Res_3, vcp_3, d_3);
 				//MatDump(vcp_3);
 				//VectorDump(d_3, 3);
-               //eig_3_v2(Res_3, vcp_3, d_3);
+               eig(Res_3, vcp_3, d_3);
 
-                matrix_mul_tran(g, g, Res_3);
-                factor_trans(Res_3, Temp_3);
-                int tmp_pos = eig_3(Temp_3, vcp_3, d_3);
+                //matrix_mul_tran(g, g, Res_3);
+                //factor_trans(Res_3, Temp_3);
+                //int tmp_pos = eig_3(Temp_3, vcp_3, d_3);
 
 				/*
                 double tmp = d_3[0];
@@ -1093,7 +1143,7 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
                     tmp = d_3[2];
                 }
                 */
-                //int tmp_pos = 2;
+                int tmp_pos = 2;
                 for (t = 0; t < vcp_3->row; t++)
                 {
                     angles[t] = vcp_3->element[t][tmp_pos];
@@ -1107,7 +1157,10 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
                     }
                 }
                 c = sqrt(0.5 + angles[0] / 2.0);
+		//factor_j = 1.0;
                 cs = 0.5 * (angles[1] - factor_j * angles[2]) / c;
+                //double su = pow(c,2) + pow(cs,2);
+                //printf("c = %f, cs = %f, sum = %f\n",c,cs, su);
                 if (cs > smax)
                     smax = cs;
                 if (fabs(cs) > jthresh)
