@@ -26,7 +26,7 @@ double *zeros_vector(int n)
     int i = 0;
     v = (double *)malloc(n * sizeof(double));
     for (i = 0; i < n; i++)
-        v[i] = 0.0f;
+        v[i] = 0.0;
     return v;
 }
 

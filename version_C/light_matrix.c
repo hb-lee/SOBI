@@ -40,11 +40,11 @@ void perm(int list[], int k, int m, int* p, Mat* mat, double* det)
 	}
 	else{
 		// if the element is 0, we don't need to calculate the value for this permutation
-		if(!equal(mat->element[k][list[k]], (double)0.0f))
+		if(!equal(mat->element[k][list[k]], (double)0.0))
 			perm(list, k + 1, m, p, mat, det);
 		for(i = k+1; i <= m; i++)
 		{
-			if(equal(mat->element[k][list[i]], (double)0.0f))
+			if(equal(mat->element[k][list[i]], (double)0.0))
 				continue;
 			swap(&list[k], &list[i]);
 			*p += 1;
@@ -88,6 +88,7 @@ TriMat* TriMatCreate(TriMat * triMat, int row, int col, int h)
     triMat->row = row;
     triMat->col = col;
     triMat->h = h;
+    TriMatZeros(triMat);
     return triMat;
 }
 
@@ -129,7 +130,7 @@ void MatDelete(Mat* mat)
 		free(mat->element[i]);
 	free(mat->element);
 }
-
+/*
 // ¸³Öµ¾ØÕóµÄÖµ
 Mat* MatSetVal(Mat* mat, double* val)
 {
@@ -143,7 +144,7 @@ Mat* MatSetVal(Mat* mat, double* val)
 
 	return mat;
 }
-
+*/
 // Êä³ö¾ØÕóµÄÖµ
 void MatDump(const Mat* mat)
 {
@@ -208,7 +209,7 @@ Mat* MatZeros(Mat* mat)
 
 	for(row = 0 ; row < mat->row ; row++){
 		for(col = 0 ; col < mat->col ; col++){
-			mat->element[row][col] = 0.0f;
+			mat->element[row][col] = 0.0;
 		}
 	}
 
@@ -224,7 +225,7 @@ TriMat* TriMatZeros(TriMat *triMat)
         {
             for (h = 0; h < triMat->h; h++)
             {
-                triMat->element[row][col][h] = 0.0f;
+                triMat->element[row][col][h] = 0.0;
             }
         }
     }
@@ -238,7 +239,7 @@ Mat* MatEye(Mat* mat)
 
 	MatZeros(mat);
 	for(i = 0 ; i < min(mat->row, mat->col) ; i++){
-		mat->element[i][i] = 1.0f;
+		mat->element[i][i] = 1.0;
 	}
 
 	return mat;
@@ -268,9 +269,9 @@ Mat* MatAdd(Mat* src1, Mat* src2, Mat* dst)
 
 	return dst;
 }
-
+/*
 // ¾ØÕó¼õ·¨
-/* dst = src1 - src2 */
+// dst = src1 - src2
 Mat* MatSub(Mat* src1, Mat* src2, Mat* dst)
 {
 	int row, col;
@@ -293,7 +294,7 @@ Mat* MatSub(Mat* src1, Mat* src2, Mat* dst)
 
 	return dst;
 }
-
+*/
 // ¾ØÕó³Ë·¨ M * N
 /* dst = src1 * src2 */
 Mat* MatMul(Mat* src1, Mat* src2, Mat* dst)
@@ -314,7 +315,7 @@ Mat* MatMul(Mat* src1, Mat* src2, Mat* dst)
 
 	for(row = 0 ; row < dst->row ; row++){
 		for(col = 0 ; col < dst->col ; col++){
-			temp = 0.0f;
+			temp = 0.0;
 			for(i = 0 ; i < src1->col ; i++){
 				temp += src1->element[row][i] * src2->element[i][col];
 			}
@@ -324,7 +325,7 @@ Mat* MatMul(Mat* src1, Mat* src2, Mat* dst)
 
 	return dst;
 }
-
+/*
 Mat* PartMatMul(Mat* src1, Mat* src2, Mat* dst, int src1_r_begin, int src2_r_begin, int src1_c_begin, int src2_c_begin, int mid)
 {
     int row, col;
@@ -333,7 +334,7 @@ Mat* PartMatMul(Mat* src1, Mat* src2, Mat* dst, int src1_r_begin, int src2_r_beg
 
 	for(row = 0 ; row < dst->row ; row++){
 		for(col = 0 ; col < dst->col ; col++){
-			temp = 0.0f;
+			temp = 0.0;
 			for(i = 0 ; i < mid ; i++){
 				temp = temp + src1->element[src1_r_begin + row][src1_c_begin + i] * src2->element[src2_r_begin + i][col + src2_c_begin];
 			}
@@ -343,6 +344,7 @@ Mat* PartMatMul(Mat* src1, Mat* src2, Mat* dst, int src1_r_begin, int src2_r_beg
 
 	return dst;
 }
+*/
 // ¾ØÕóµÄ×ªÖÃ
 /* dst = src' */
 Mat* MatTrans(Mat* src, Mat* dst)
@@ -366,12 +368,12 @@ Mat* MatTrans(Mat* src, Mat* dst)
 
 	return dst;
 }
-
+/*
 // ¾ØÕóĞĞÁĞÊ½
 // return det(mat)
 double MatDet(Mat* mat)
 {
-	double det = 0.0f;
+	double det = 0.0;
 	int plarity = 0;
 	int *list;
 	int i;
@@ -380,14 +382,14 @@ double MatDet(Mat* mat)
 	if( mat->row != mat->col){
 		printf("err check, not a square matrix for MatDetermine\n");
 		MatDump(mat);
-		return 0.0f;
+		return 0.0;
 	}
 #endif
 
 	list = (int*)malloc(sizeof(int)*mat->col);
 	if(list == NULL){
 		printf("malloc list fail\n");
-		return 0.0f;
+		return 0.0;
 	}
 	for(i = 0 ; i < mat->col ; i++)
 		list[i] = i;
@@ -397,7 +399,8 @@ double MatDet(Mat* mat)
 
 	return det;
 }
-
+*/
+/*
 // °éËæ¾ØÕó
 // dst = adj(src)
 Mat* MatAdj(Mat* src, Mat* dst)
@@ -444,7 +447,8 @@ Mat* MatAdj(Mat* src, Mat* dst)
 
 	return dst;
 }
-
+*/
+/*
 // ¾ØÕóµÄÄæ
 // dst = src^(-1)
 Mat* MatInv(Mat* src, Mat* dst)
@@ -465,7 +469,7 @@ Mat* MatInv(Mat* src, Mat* dst)
 	MatAdj(src, &adj_mat);
 	det = MatDet(src);
 
-	if(equal(det, (double)0.0f)){
+	if(equal(det, (double)0.0)){
 		printf("err, determinate is 0 for MatInv\n");
 		return NULL;
 	}
@@ -479,7 +483,7 @@ Mat* MatInv(Mat* src, Mat* dst)
 
 	return dst;
 }
-
+*/
 // ¾ØÕó¿½±´
 void MatCopy(Mat* src, Mat* dst)
 {
@@ -535,7 +539,7 @@ void MatZeroConstruct(Mat * mat, int row, int col)
 	for(i = 0 ; i < row ; i++){
 		mat->element[i] = (double*)malloc(col * sizeof(double));
 		for (j = 0; j < col; j++)
-            mat->element[i][j] = 0.0f;
+            mat->element[i][j] = 0.0;
 	}
 
 	mat->row = row;
@@ -557,7 +561,7 @@ void MatEyeConstruct(Mat * mat, int row, int col)
             if (i == j)
                 mat->element[i][j] = 1;
             else
-                mat->element[i][j] = 0.0f;
+                mat->element[i][j] = 0.0;
 	}
 
 	mat->row = row;
