@@ -19,12 +19,12 @@ void swap(int *a, int *b)
 	*b = m;
 }
 
-void perm(int list[], int k, int m, int* p, Mat* mat, float* det)
+void perm(int list[], int k, int m, int* p, Mat* mat, double* det)
 {
 	int i;
 
 	if(k > m){
-		float res = mat->element[0][list[0]];
+		double res = mat->element[0][list[0]];
 
 		for(i = 1; i < mat->row ; i++){
 			res *= mat->element[i][list[i]];
@@ -40,11 +40,11 @@ void perm(int list[], int k, int m, int* p, Mat* mat, float* det)
 	}
 	else{
 		// if the element is 0, we don't need to calculate the value for this permutation
-		if(!equal(mat->element[k][list[k]], (float)0.0))
+		if(!equal(mat->element[k][list[k]], (double)0.0))
 			perm(list, k + 1, m, p, mat, det);
 		for(i = k+1; i <= m; i++)
 		{
-			if(equal(mat->element[k][list[i]], (float)0.0))
+			if(equal(mat->element[k][list[i]], (double)0.0))
 				continue;
 			swap(&list[k], &list[i]);
 			*p += 1;
@@ -76,13 +76,13 @@ TriMat * ConstructTriMat()
 TriMat* TriMatCreate(TriMat * triMat, int row, int col, int h)
 {
     int i, j;
-    triMat->element = (float ***)malloc(row * sizeof(float *));
+    triMat->element = (double ***)malloc(row * sizeof(double *));
     for (i = 0; i < row; i++)
     {
-        triMat->element[i] = (float **)malloc(col * sizeof(float *));
+        triMat->element[i] = (double **)malloc(col * sizeof(double *));
         for (j = 0; j < col; j++)
         {
-            triMat->element[i][j] = (float *)malloc(h * sizeof(float));
+            triMat->element[i][j] = (double *)malloc(h * sizeof(double));
         }
     }
     triMat->row = row;
@@ -98,13 +98,13 @@ Mat* MatCreate(Mat* mat, int row, int col)
     Mat * p;
 	int i;
 
-	mat->element = (float**)malloc(row * sizeof(float*));
+	mat->element = (double**)malloc(row * sizeof(double*));
 	if(mat->element == NULL){
 		printf("mat create fail!\n");
 		return NULL;
 	}
 	for(i = 0 ; i < row ; i++){
-		mat->element[i] = (float*)malloc(col * sizeof(float));
+		mat->element[i] = (double*)malloc(col * sizeof(double));
 		if(mat->element[i] == NULL){
 			int j;
 			printf("mat create fail!\n");
@@ -118,31 +118,6 @@ Mat* MatCreate(Mat* mat, int row, int col)
 	mat->row = row;
 	mat->col = col;
     mat = MatZeros(mat);
-    mat->c_element = NULL;
-	return mat;
-}
-
-Mat* MatCCreate(Mat* mat, int row, int col)
-{
-    Mat * p;
-	int i;
-
-	mat->c_element = (float**)malloc(row * sizeof(float*));
-	if(mat->c_element == NULL){
-		printf("mat create fail!\n");
-		return NULL;
-	}
-	for(i = 0 ; i < row ; i++){
-		mat->c_element[i] = (float*)malloc(col * sizeof(float));
-		if(mat->c_element[i] == NULL){
-			int j;
-			printf("mat create fail!\n");
-			for(j = 0 ; j < i ; j++)
-				free(mat->c_element[j]);
-			free(mat->c_element);
-			return NULL;
-		}
-	}
 	return mat;
 }
 
@@ -157,7 +132,7 @@ void MatDelete(Mat* mat)
 }
 /*
 // 赋值矩阵的值
-Mat* MatSetVal(Mat* mat, float* val)
+Mat* MatSetVal(Mat* mat, double* val)
 {
 	int row,col;
 
@@ -215,7 +190,7 @@ void TriMatDump(const TriMat * triMat, int h)
     fclose(fp);
 }
 
-void VectorDump (const float * v, int n)
+void VectorDump (const double * v, int n)
 {
     int i = 0;
     FILE * fp = fopen("matrix_debug.txt", "a+");
@@ -257,13 +232,12 @@ TriMat* TriMatZeros(TriMat *triMat)
     return triMat;
 }
 
-float *zeros_vector(int n)
+double *zeros_vector(int n)
 {
-    float *v;
+    double *v;
     int i = 0;
-    v = (float *)malloc(n * sizeof(float));
-    for (i = 0; i < n; i++)
-        v[i] = 0.0;
+    v = (double *)malloc(n * sizeof(double));
+    memset(v, 0, n*sizeof(double));
     return v;
 }
 
@@ -336,7 +310,7 @@ Mat* MatMul(Mat* src1, Mat* src2, Mat* dst)
 {
 	int row, col;
 	int i;
-	float temp;
+	double temp;
 
 #ifdef MAT_LEGAL_CHECKING
 	if( src1->col != src2->row || src1->row != dst->row || src2->col != dst->col ){
@@ -365,7 +339,7 @@ Mat* PartMatMul(Mat* src1, Mat* src2, Mat* dst, int src1_r_begin, int src2_r_beg
 {
     int row, col;
 	int i;
-	float temp;
+	double temp;
 
 	for(row = 0 ; row < dst->row ; row++){
 		for(col = 0 ; col < dst->col ; col++){
@@ -406,9 +380,9 @@ Mat* MatTrans(Mat* src, Mat* dst)
 /*
 // 矩阵行列式
 // return det(mat)
-float MatDet(Mat* mat)
+double MatDet(Mat* mat)
 {
-	float det = 0.0;
+	double det = 0.0;
 	int plarity = 0;
 	int *list;
 	int i;
@@ -443,7 +417,7 @@ Mat* MatAdj(Mat* src, Mat* dst)
 	Mat smat;
 	int row, col;
 	int i,j,r,c;
-	float det;
+	double det;
 
 #ifdef MAT_LEGAL_CHECKING
 	if( src->row != src->col || src->row != dst->row || src->col != dst->col){
@@ -489,7 +463,7 @@ Mat* MatAdj(Mat* src, Mat* dst)
 Mat* MatInv(Mat* src, Mat* dst)
 {
 	Mat adj_mat;
-	float det;
+	double det;
 	int row, col;
 
 #ifdef MAT_LEGAL_CHECKING
@@ -504,7 +478,7 @@ Mat* MatInv(Mat* src, Mat* dst)
 	MatAdj(src, &adj_mat);
 	det = MatDet(src);
 
-	if(equal(det, (float)0.0)){
+	if(equal(det, (double)0.0)){
 		printf("err, determinate is 0 for MatInv\n");
 		return NULL;
 	}
@@ -539,7 +513,7 @@ void MatCopy(Mat* src, Mat* dst)
 	}
 }
 
-void MatNumMult(Mat * src, float k)
+void MatNumMult(Mat * src, double k)
 {
     int row, col;
     for (row = 0;  row < src->row; row++)
@@ -549,7 +523,7 @@ void MatNumMult(Mat * src, float k)
     }
 }
 
-void TriMatNumMult(TriMat * src, float k)
+void TriMatNumMult(TriMat * src, double k)
 {
     int row, col, h;
     for (row = 0; row < src->row; row++)
@@ -566,13 +540,13 @@ void MatZeroConstruct(Mat * mat, int row, int col)
 {
 	int i, j;
 
-	mat->element = (float**)malloc(row * sizeof(float*));
+	mat->element = (double**)malloc(row * sizeof(double*));
 	if(mat->element == NULL){
 		printf("mat create fail!\n");
 		return NULL;
 	}
 	for(i = 0 ; i < row ; i++){
-		mat->element[i] = (float*)malloc(col * sizeof(float));
+		mat->element[i] = (double*)malloc(col * sizeof(double));
 		for (j = 0; j < col; j++)
             mat->element[i][j] = 0.0;
 	}
@@ -581,39 +555,21 @@ void MatZeroConstruct(Mat * mat, int row, int col)
 	mat->col = col;
 }
 
-void MatZeroCConstruct(Mat * mat, int row, int col)
-{
-	int i, j;
-
-	mat->c_element = (float**)malloc(row * sizeof(float*));
-	if(mat->c_element == NULL){
-		printf("mat create fail!\n");
-		return NULL;
-	}
-	for(i = 0 ; i < row ; i++){
-		mat->c_element[i] = (float*)malloc(col * sizeof(float));
-		for (j = 0; j < col; j++)
-            mat->c_element[i][j] = 0.0;
-	}
-
-	mat->row = row;
-	mat->col = col;
-}
 
 void MatEyeConstruct(Mat * mat, int row, int col)
 {
     int i, j;
 
-	mat->element = (float**)malloc(row * sizeof(float*));
+	mat->element = (double**)malloc(row * sizeof(double*));
 	if(mat->element == NULL){
 		printf("mat create fail!\n");
 		return NULL;
 	}
 	for(i = 0 ; i < row ; i++){
-		mat->element[i] = (float*)malloc(col * sizeof(float));
+		mat->element[i] = (double*)malloc(col * sizeof(double));
 		for (j = 0; j < col; j++)
             if (i == j)
-                mat->element[i][j] = 1;
+                mat->element[i][j] = 1.0;
             else
                 mat->element[i][j] = 0.0;
 	}
