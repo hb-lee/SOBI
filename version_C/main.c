@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include "light_matrix.h"
+#include "matrix.h"
+#include "sse_opt.h"
 
 #include "/home/lhb/PAC/software/mkl/include/mkl.h"
 //#include "/home/SystemSoftware/intel2017/mkl/include/mkl.h"
@@ -45,6 +46,22 @@ int main()
     printf("begin to execute sobi algorithnm\n");
     sobi(eeg_data, TAU, fs, jthresh, W);
     return 0;
+}
+
+static inline double myinvsqrt(double x)
+{
+    double xhalf = 0.5*x;
+    float xf = (float)x;
+    __asm__
+    {
+        movss xmm1,xf
+        rsqrtss xmm1,xmm1
+        movss xf,xmm1
+    }
+    x = (double)xf;
+    x = x*(1.5-xhalf*x*x);
+    x = x*(1.5-xhalf*x*x);
+    return x;
 }
 
 void init_tau(int *tau, int length)
@@ -129,10 +146,10 @@ void read_eig_vec(Mat *mat)
     int i,j;
     size_t result;
     FILE *file;
-    file = fopen("ss.bin", "rb");
+    file = fopen("S1.bin", "rb");
     if (!file)
     {
-        fprintf(stderr, "can't open file %s", "ss.bin");
+        fprintf(stderr, "can't open file %s", "S1.bin");
         exit(1);
     }
     fseek(file, 0, SEEK_END);
@@ -173,10 +190,10 @@ void read_eig_val(double * val, int n)
     int i;
     size_t result;
     FILE *file;
-    file = fopen("slam.bin", "rb");
+    file = fopen("lambda.bin", "rb");
     if (!file)
     {
-        fprintf(stderr, "can't open file %s", "slam.bin");
+        fprintf(stderr, "can't open file %s", "lambda.bin");
         exit(1);
     }
     fseek(file, 0, SEEK_END);
@@ -213,10 +230,10 @@ void read_rtau(Mat *mat)
     int i,j;
     size_t result;
     FILE *file;
-    file = fopen("sr_all.bin", "rb");
+    file = fopen("r_all.bin", "rb");
     if (!file)
     {
-        fprintf(stderr, "can't open file %s", "sr_all.bin");
+        fprintf(stderr, "can't open file %s", "r_all.bin");
         exit(1);
     }
     fseek(file, 0, SEEK_END);
@@ -557,8 +574,8 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
     Mat * RR_sub;
     RR_sub = ConstructMat();
     MatZeroConstruct(RR_sub, eeg_data->row, eeg_data->row);
-    double * avg = (double *)malloc(eeg_data->row * sizeof(double));
-    //memset(avg,0,eeg_data->row*sizeof(double));
+    //modify
+    float * avg = (float *)malloc(eeg_data->row * sizeof(float));
 
     printf("sobi begin to execute step 1\n");
 
@@ -568,12 +585,6 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
         // Set XEEG
         for (j = 0; j < XEEG->row; j++)
         {
-            /*
-            for (s = 0; s < XEEG->col; s++)
-            {
-                XEEG->element[j][s] = eeg_data->element[j][i + s];
-            }*/
-
             for (k = i, s = 0; k < i + lblk + taumax; k++, s++)
             {
                 XEEG->element[j][s] = eeg_data->element[j][k];
@@ -581,7 +592,6 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
         }
         printf("calculate mean\n");
         // get mean
-        double num = lblk + taumax;
         memset(avg,0,eeg_data->row*sizeof(double));
         for (j = 0; j < XEEG->row; j++)
         {
@@ -590,7 +600,7 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
             {
                 temp += XEEG->element[j][k];
             }
-            avg[j] = temp / num;
+            avg[j] = temp / (lblk + taumax);
         }
         printf("calculate x - u\n");
         // get x - u
@@ -641,7 +651,7 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
         printf("index i = %d, TT = %d\n", i, TT);
     }
 
-    temp = 1.0 / (double)TT;
+    temp = 1.0 / TT;
     TriMatNumMult(Rtau_all, temp);
 /*
     //debug
@@ -682,31 +692,23 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
         }
     }
     TR0 = MatTrans(R0, TR0);
-    Nsn = R0->row;
-
-/*
     Nsn = Rtau_all->row;
-    int ttt = Rtau_all->row;
-    Mat * S = ConstructMat();
-    MatCreate(S, Nsn, ttt);
-    double *lambda = zeros_vector(Nsn);
-    read_eig_vec(S);
-    read_eig_val(lambda, Nsn);
-    Mat * Target;
-    Target = ConstructMat();
-    Target = MatCreate(Target, Nsn, ttt);
-    */
-
-
 
     int ttt = R0->col;
     int N = Nsn;
+    Mat * B;
+    B = ConstructMat();
+    MatZeroConstruct(B, Nsn, ttt);
+    Mat * TB;
+    TB = ConstructMat();
+    MatZeroConstruct(TB, ttt, Nsn);
     Mat * Target;
     Target = ConstructMat();
     MatZeroConstruct(Target, Nsn, ttt);
     for (i = 0; i < Nsn; i++)
     {
-        for (j = 0; j < ttt; j++)
+        //for (j = 0; j < ttt; j++)
+        for(j = i; j < ttt; j++)
         {
             Target->element[i][j] = (R0->element[i][j] + TR0->element[i][j]) * 0.5;
         }
@@ -722,77 +724,27 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
     S1 = ConstructMat();
     MatZeroConstruct(S1, ttt, Nsn);
     double * lam1 = zeros_vector(Nsn);
+    /*
     for (i = 0; i < ttt; i++)
     {
         for (j = 0; j < Nsn; j++)
         {
             S1->element[i][j] = S->element[i][Nsn - j - 1];
         }
-    }
+    }*/
     for (i = 0; i < Nsn; i++)
     {
         lam1[i] = sqrt(1.0 / (lambda[Nsn - 1 - i] + 1e-20));
     }
-    /*
-    eig(Target, S, lambda);
 
-    // sort the eigenvalue
-    double t0 = 0.0;
-    int noswap = 1;
-    // sort eigenvalue and eigenvector (big to small sequence >...>)
-    for (i = 0; i < Nsn; i++)
-    {
-        noswap = 1;
-        for (j = 0; j < Nsn - 1 - i; j++)
-        {
-            if (lambda[j] < lambda[j + 1])
-            {
-                t0 = lambda[j];
-                lambda[j] = lambda[j + 1];
-                lambda[j + 1] = t0;
-
-                // matrix V in eig decomposition
-                for (k = 0; k < S->row; k++)
-                {
-                    t0 = S->element[k][j];
-                    S->element[k][j] = S->element[k][j + 1];
-                    S->element[k][j + 1] = t0;
-                }
-                noswap = 0;
-            }
-        }
-        if (noswap == 1)
-                break;
-    }
-*/
-
-    printf("get sorted eig value done!\n");
-    Mat * B;
-    B = ConstructMat();
-    MatZeroConstruct(B, Nsn, ttt);
-    Mat * TB;
-    TB = ConstructMat();
-    MatZeroConstruct(TB, ttt, Nsn);
-    /*
-    for (i = 0; i < Nsn; i++)
-    {
-        for (j = 0; j < ttt; j++)
-        {
-            if (i == j)
-                Target->element[i][j] = sqrt(1.0 / (lambda[i] + 1e-20));
-            else
-                Target->element[i][j] = 0.0;
-        }
-    }
-    matrix_mul_notran(S, Target, TB);
-    */
     for (i = 0; i < ttt; i++)
     {
         for (j = 0; j < Nsn; j++)
         {
-            TB->element[i][j] = S1->element[i][j] * lam1[j];
+            TB->element[i][j] = S->element[i][Nsn - 1 -j] * lam1[j];
         }
     }
+
     B = MatTrans(TB, B);
     TriMat * Rtau_presphered;
     Rtau_presphered = ConstructTriMat();
@@ -832,12 +784,6 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
     {
         for (j = 0; j < RRR->row; j++)
         {
-            /*
-            for (s = 0; s < Rtau_presphered->col; s++)
-            {
-                RRR->element[j][i * 128 + s] = Rtau_presphered->element[j][s][i];
-            }*/
-
             for (k = N_princComp * i, s = 0; s < Rtau_presphered->col; s++, k++)
             {
                 RRR->element[j][k] = Rtau_presphered->element[j][s][i]; // 3-D to 2-D
@@ -907,8 +853,14 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
     Mat * tmp_A = NULL;
     tmp_A = ConstructMat();
     MatZeroConstruct(tmp_A, A->row, 2 * (nm / m));
+    double givens[5] = {-1.0,-1.0,-1.0,-1.0,-1.0};
     printf("begin to iteration !\n");
 
+    //modify
+    double * tp_V = (double *)malloc(128*sizeof(double));
+    double * tq_V = (double *)malloc(128*sizeof(double));
+    double * tp_A = (double *)malloc(5248*sizeof(double));
+    double * tq_A = (double *)malloc(5248*sizeof(double));
     while (encore == 1)
     {
         encore = 0;
@@ -921,16 +873,6 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
             }
             for (j = i + 1; j < m; j++)
             {
-                /*
-                for (s = 0; s < 41; s++)
-                {
-                    Ip[s] = i + m * s;
-                    Iq[s] = j + m * s;
-                    g->element[0][s] = A->element[i][Ip[s]] - A->element[j][Iq[s]];
-                    g->element[1][s] = A->element[i][Iq[s]];
-                    g->element[2][s] = A->element[i][Iq[s]];
-                }*/
-
                 for (k = j, s = 0; k < nm; k = k + m, s++)
                 {
                     Iq[s] = k;
@@ -938,44 +880,23 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
                 for (s = 0; s < (nm / m); s++)
                 {
                     g->element[0][s] = A->element[i][Ip[s]] - A->element[j][Iq[s]];
-                    //g->c_element[0][s] = A->c_element[i][Ip[s]] - A->c_element[j][Iq[s]];
                 }
                 for (s = 0; s < (nm / m); s++)
                 {
                     //g->element[1][s] = A->element[i][Iq[s]] + A->element[j][Ip[s]];
                     g->element[1][s] = A->element[i][Iq[s]];
-                    //g->c_element[1][s] = A->c_element[i][Iq[s]];
                 }
                 for (s = 0; s < (nm / m); s++)
                 {
                     //g->element[2][s] = A->element[j][Ip[s]] - A->element[i][Iq[s]];
                     g->element[2][s] = A->element[j][Ip[s]];
-                    //g->c_element[2][s] = A->c_element[j][Ip[s]];
                 }
 
                 matrix_mul_tran(g,g,Temp_3);
                 matrix_mul_notran(B0, Temp_3, Res_3);
                 matrix_mul_notran(Res_3,TB0,Temp_3);
                 eig(Temp_3, vcp_3, d_3);
-                //factor_trans(Temp_3,Res_3);
-                //matrix_cmul(g,tg,Temp_3,false);
-                //matrix_cmul(B0,Temp_3,Res_3,false);
-                //matrix_cmul(Res_3,TB0,Temp_3,false);
-                //matrix_c_to_r(Temp_3,t_3);
-                //matrix_mul_tran(g,g,Res_3);
-                //eig(Res_3,vcp_3,d_3);
-                //matrix_mul_tran(g, g, Res_3);
-                //int tmp_pos = schur_eig(Res_3, vcp_3, d_3);
-                //Temp_3 = MatMul(B0, Res_3, Temp_3);
-                //Res_3 = MatMul(Temp_3, TB0, Res_3);
-                //eig_3(Res_3, vcp_3, d_3);
-				//eig(Res_3, vcp_3, d_3);
-                //eig(Res_3, vcp_3, d_3);
 
-                //matrix_mul_tran(g, g, Res_3);
-                //factor_trans(Res_3, Temp_3);
-               // int tmp_pos = eig_3(Temp_3, vcp_3, d_3);
-                //int tmp_pos = eig_3(Temp_3, vcp_3, d_3);
                 int tmp_pos = 2;
                 for (t = 0; t < vcp_3->row; t++)
                 {
@@ -990,89 +911,31 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
                     }
                 }
                 c = sqrt(0.5 + angles[0] / 2.0);
-                //cs = 0.5 * (angles[1] - factor_j * angles[2]) / c;
-                //ccs = sqrt(0.5 - angles[0] / 2.0);
-                //if (angles[1] > 0)
-                //    cs = ccs;
-                //else
-                //    cs = -ccs;
-                //cs = 0.5 * (angles[1] - 8 * angles[2]) / c;
-                cs = 0.5 * (angles[1]) / c;
-                //cs = 0.5*angles[1]/c;
-                //ccs = (-0.5)*angles[2]/c;
-                //double mx = pow(cs,2);
-                //if (mx > pow(smax,2))
-                 //   smax = sqrt(mx);
+                cs = 0.5 * (angles[1] - 8 * angles[2]) / c;
+                //cs = 0.5 * (angles[1]) / c;
+
                 smax = (cs > smax) ? cs : smax;
                 if (fabs(cs) > jthresh)
                 {
                     encore = 1;
                     pair[0] = i;
                     pair[1] = j;
-                    //construct_givens(G, c,cs,ccs);
-                    //trans_givens(G,TG);
-                    G->element[0][0] = c;
-                    G->element[0][1] = -cs;
-                    G->element[1][0] = cs;
-                    G->element[1][1] = c;
 
-                    // V(:,pair)       = V(:,pair)*G  in matlab
-                    for (t = 0; t < V->row; t++)
-                    {
-                        temp1 = V->element[t][pair[0]] * G->element[0][0] + V->element[t][pair[1]] * G->element[1][0];
-                        temp2 = V->element[t][pair[0]] * G->element[0][1] + V->element[t][pair[1]] * G->element[1][1];
-                        V->element[t][pair[0]] = temp1;
-                        V->element[t][pair[1]] = temp2;
-                    }
-
-					// A(pair,:)       = G' * A(pair,:) ;
-                    for (t = 0; t < A->col; t++)
-                    {
-                        temp1 = G->element[0][0] * A->element[pair[0]][t] + G->element[1][0] * A->element[pair[1]][t];
-                        temp2 = G->element[0][1] * A->element[pair[0]][t] + G->element[1][1] * A->element[pair[1]][t];
-                        A->element[pair[0]][t] = temp1;
-                        A->element[pair[1]][t] = temp2;
-                    }
-/*
+                    // modify
+                    givens[1] = c;
+                    givens[2] = -cs;
+                    givens[3] = cs;
+                    givens[4] = c;
+                    memset(tp_V, 0, 128*sizeof(double));
+                    memset(tq_V, 0, 128*sizeof(double));
+                    memset(tp_A, 0, 5248*sizeof(double));
+                    memset(tq_A, 0, 5248*sizeof(double));
+                    cblas_drotm(128, &(V->element[i][0]),1,&(V->element[j][0]),1,givens);
+                    cblas_drotm(5248,&(A->element[i][0]),1,&(A->element[j][0]),1,givens);
                     for (t = 0; t < A->row; t++)
                     {
-                        for (s = 0; s < nm / m; s++)
-                        {
-                            temp1 = A->element[t][Ip[s]];
-                            temp2 = A->element[t][Iq[s]];
-                            A->element[t][Ip[s]] = c * temp1 + cs * temp2;
-                            A->element[t][Iq[s]] = (-cs) * temp1 + c * temp2;
-                        }
+                        cblas_drotm(41,&(A->element[t][i]),128,&(A->element[t][j]),128,givens);
                     }
-                    */
-
-					//  A(:,[Ip Iq])    = [ c*A(:,Ip)+s*A(:,Iq) -conj(s)*A(:,Ip)+c*A(:,Iq) ]
-                    for (t = 0; t < A->row; t++)
-                    {
-                        for (s = 0; s < nm / m; s++)
-                        {
-                            temp1 = G->element[0][0] * A->element[t][Ip[s]] + G->element[1][0] * A->element[t][Iq[s]];
-                            tmp_A->element[t][s] = temp1;
-                            temp2 = G->element[0][1] * A->element[t][Ip[s]] + G->element[1][1] * A->element[t][Iq[s]];
-                            tmp_A->element[t][s + (nm / m)] = temp2;
-                        }
-                    }
-                    for (t = 0; t < A->row; t++)
-                    {
-                        for (s = 0; s < nm / m; s++)
-                        {
-                            A->element[t][Ip[s]] = tmp_A->element[t][s];
-                        }
-                    }
-                    for (t = 0; t < A->row; t++)
-                    {
-                        for (s = 0; s < nm / m; s++)
-                        {
-                            A->element[t][Iq[s]] = tmp_A->element[t][s + (nm / m)];
-                        }
-                    }
-
-
                 }
             }
         }
@@ -1081,7 +944,8 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
         printf("iter times = %d, accuracy = %f\n", iter_count, smax);
     }
     printf("finish the iteration!\n");
-    W_scaled = MatTrans(V, W_scaled);
+    //W_scaled = MatTrans(V, W_scaled);
+    W_scaled = V;
     matrix_mul_notran(W_scaled,B_mult,W_unscaled);
     double * scaling_factor = (double*)malloc(128*sizeof(double));
     memset(scaling_factor,0,128*sizeof(double));
@@ -1092,31 +956,18 @@ void sobi(Mat * eeg_data, int * TAU, int fs, double jthresh, Mat *W)
         {
             temp += W_unscaled->element[i][j] * W_unscaled->element[i][j];
         }
-        scaling_factor[i] = sqrt(temp);
+        //scaling_factor[i] = sqrt(temp);
+        scaling_factor[i] = myinvsqrt(temp);
     }
 
     for (i = 0; i < W_unscaled->row; i++)
     {
         for (j = 0; j < W_unscaled->col; j++)
         {
-            W_scaled->element[i][j] = W_unscaled->element[i][j] / scaling_factor[i];
+            //W_scaled->element[i][j] = W_unscaled->element[i][j] / scaling_factor[i];
+            W_scaled->element[i][j] = W_unscaled->element[i][j] * scaling_factor[i];
         }
     }
-    /*
-    for (i = 0; i < W_unscaled->row; i++)
-    {
-        temp = 0.0;
-        for (j = 0; j < W_unscaled->col; j++)
-        {
-            temp1 = temp1 + (W_unscaled->element[i][j] * W_unscaled->element[i][j]);
-        }
-        scaling_factor = sqrt(temp1);
-        for (j = 0; j < W_unscaled->col; j++)
-        {
-            W_scaled->element[i][j] = W_unscaled->element[i][j] / scaling_factor;
-        }
-    }
-    */
     //W = W_scaled;
     store_result(W_scaled);
     return;
