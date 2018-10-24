@@ -1,0 +1,15 @@
+#!/bin/sh -f
+#PBS -N LHB_RUN
+#PBS -o lhb_sobi.out
+#PBS -e lhb_sobi.err
+#PBS -l nodes=2:ppn=24
+#PBS -q q_qnlm
+
+source /home/app_path/intel2017.sh
+
+cd $PBS_O_WORKDIR
+mpirun -machinefile $PBS_NODEFILE -np 2 ./sobi > output
+
+#./sobi > output
+
+
